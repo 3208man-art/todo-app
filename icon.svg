@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- 背景 -->
+  <rect width="512" height="512" rx="96" fill="#0d3b52"/>
+  <!-- チェックリストの線 -->
+  <rect x="160" y="156" width="192" height="20" rx="10" fill="#e0f7fa" opacity="0.4"/>
+  <rect x="160" y="246" width="192" height="20" rx="10" fill="#e0f7fa" opacity="0.4"/>
+  <rect x="160" y="336" width="192" height="20" rx="10" fill="#e0f7fa" opacity="0.4"/>
+  <!-- チェックマーク (完了アイテム) -->
+  <circle cx="124" cy="166" r="18" fill="none" stroke="#e0f7fa" stroke-width="8" opacity="0.9"/>
+  <polyline points="113,166 121,175 137,157" fill="none" stroke="#e0f7fa" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- 未完了アイテムの丸 -->
+  <circle cx="124" cy="256" r="18" fill="none" stroke="#e0f7fa" stroke-width="8" opacity="0.5"/>
+  <circle cx="124" cy="346" r="18" fill="none" stroke="#e0f7fa" stroke-width="8" opacity="0.5"/>
+</svg>

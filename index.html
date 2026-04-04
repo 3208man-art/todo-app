@@ -3,7 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ToDo</title>
+  <title>ToDoアプリ</title>
+
+  <!-- PWA: マニフェスト -->
+  <link rel="manifest" href="manifest.json">
+
+  <!-- PWA: テーマカラー（ブラウザのUIバーの色） -->
+  <meta name="theme-color" content="#0d3b52">
+
+  <!-- PWA: iOSホーム画面追加サポート -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ToDoアプリ">
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
 
@@ -16,7 +27,7 @@
     body {
       font-family: 'Inter', 'Segoe UI', sans-serif;
       min-height: 100vh;
-      background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%);
       display: flex;
       align-items: flex-start;
       justify-content: center;
@@ -26,13 +37,11 @@
     .card {
       width: 100%;
       max-width: 460px;
-      background: rgba(255, 255, 255, 0.15);
-      backdrop-filter: blur(24px);
-      -webkit-backdrop-filter: blur(24px);
-      border: 1px solid rgba(255,255,255,0.18);
+      background: #e0f7fa;
+      border: none;
       border-radius: 24px;
       padding: 36px 32px;
-      box-shadow: 0 24px 60px rgba(0,0,0,0.25);
+      box-shadow: 0 24px 60px rgba(0,0,0,0.4);
     }
 
     .header {
@@ -42,13 +51,13 @@
     .header h1 {
       font-size: 1.8rem;
       font-weight: 600;
-      color: #fff;
+      color: #0d3b52;
       letter-spacing: -0.5px;
     }
 
     .header p {
       font-size: 0.85rem;
-      color: rgba(255,255,255,0.55);
+      color: #5a8fa3;
       margin-top: 4px;
     }
 
@@ -61,29 +70,29 @@
     .input-row input {
       flex: 1;
       padding: 12px 16px;
-      background: rgba(255,255,255,0.12);
-      border: 1px solid rgba(255,255,255,0.2);
+      background: #fff;
+      border: 1.5px solid #b2dce8;
       border-radius: 12px;
       font-size: 0.95rem;
       font-family: inherit;
-      color: #fff;
+      color: #0d3b52;
       outline: none;
       transition: border-color 0.2s, background 0.2s;
     }
 
     .input-row input::placeholder {
-      color: rgba(255,255,255,0.4);
+      color: #a0c4d4;
     }
 
     .input-row input:focus {
-      border-color: rgba(255,255,255,0.5);
-      background: rgba(255,255,255,0.18);
+      border-color: #0d3b52;
+      background: #fff;
     }
 
     .input-row button {
       padding: 12px 20px;
-      background: #fff;
-      color: #11998e;
+      background: #0d3b52;
+      color: #e0f7fa;
       border: none;
       border-radius: 12px;
       font-size: 0.95rem;
@@ -112,11 +121,11 @@
 
     .stat {
       font-size: 0.78rem;
-      color: rgba(255,255,255,0.55);
+      color: #5a8fa3;
     }
 
     .stat span {
-      color: rgba(255,255,255,0.9);
+      color: #0d3b52;
       font-weight: 500;
     }
 
@@ -132,8 +141,8 @@
       align-items: center;
       gap: 12px;
       padding: 14px 16px;
-      background: rgba(255,255,255,0.1);
-      border: 1px solid rgba(255,255,255,0.12);
+      background: #fff;
+      border: 1px solid #b2dce8;
       border-radius: 14px;
       transition: background 0.2s, transform 0.15s;
       animation: slideIn 0.2s ease;
@@ -145,12 +154,12 @@
     }
 
     #todo-list li:hover {
-      background: rgba(255,255,255,0.16);
+      background: #f0faff;
       transform: translateX(2px);
     }
 
     #todo-list li.done {
-      background: rgba(255,255,255,0.05);
+      background: #f5fbfd;
     }
 
     /* カスタムチェックボックス */
@@ -173,7 +182,7 @@
     .checkbox-wrap .box {
       width: 20px;
       height: 20px;
-      border: 2px solid rgba(255,255,255,0.35);
+      border: 2px solid #b2dce8;
       border-radius: 6px;
       display: flex;
       align-items: center;
@@ -183,15 +192,15 @@
     }
 
     .checkbox-wrap input:checked ~ .box {
-      background: #fff;
-      border-color: #fff;
+      background: #0d3b52;
+      border-color: #0d3b52;
     }
 
     .checkbox-wrap .box::after {
       content: '';
       width: 5px;
       height: 9px;
-      border: 2px solid #764ba2;
+      border: 2px solid #e0f7fa;
       border-top: none;
       border-left: none;
       transform: rotate(45deg) translateY(-1px);
@@ -206,20 +215,20 @@
     .task-text {
       flex: 1;
       font-size: 0.93rem;
-      color: rgba(255,255,255,0.9);
+      color: #0d3b52;
       word-break: break-word;
       transition: color 0.2s;
     }
 
     li.done .task-text {
       text-decoration: line-through;
-      color: rgba(255,255,255,0.35);
+      color: #a0c4d4;
     }
 
     .delete-btn {
       background: none;
       border: none;
-      color: rgba(255,255,255,0.25);
+      color: #b2dce8;
       font-size: 1.1rem;
       cursor: pointer;
       padding: 4px 6px;
@@ -236,7 +245,7 @@
 
     .empty {
       text-align: center;
-      color: rgba(255,255,255,0.35);
+      color: #a0c4d4;
       font-size: 0.88rem;
       padding: 28px 0;
     }
@@ -350,6 +359,14 @@
     });
 
     render();
+
+    // PWA: Service Worker を登録してオフライン対応を有効化
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js')
+          .catch(err => console.warn('SW registration failed:', err));
+      });
+    }
   </script>
 </body>
 </html>
