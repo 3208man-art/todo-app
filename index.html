@@ -671,6 +671,67 @@
     // 現在編集中のタスクID（null = 編集中なし）
     let currentEditId = null;
 
+    // ============================================================
+    // 通知機能
+    //
+    // ブラウザの Notification API を使って、期限が今日・明日のタスクを通知する。
+    // 「このページを開いた1回だけ」通知を出す仕組みにするため、
+    // notifiedIds という Set（重複なしのリスト）に通知済みのタスクIDを記録する。
+    // すでに記録済みなら通知しない → 画面更新ごとに何度も出ることを防ぐ。
+    // ============================================================
+
+    // このページを開いている間に通知済みのタスクID を記録するセット
+    const notifiedIds = new Set();
+
+    // 通知許可をリクエストして、許可されたら期限チェックを行う
+    async function requestNotificationPermission() {
+      // ブラウザが通知に対応していない場合は何もしない
+      if (!('Notification' in window)) return;
+
+      // すでに許可済みならそのままチェック、拒否済みなら何もしない
+      if (Notification.permission === 'granted') {
+        checkDeadlineNotifications();
+      } else if (Notification.permission !== 'denied') {
+        // まだ許可/拒否を決めていない場合、ユーザーに許可を求めるダイアログを出す
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+          checkDeadlineNotifications();
+        }
+      }
+    }
+
+    // 期限が今日・明日の未完了タスクを通知する
+    function checkDeadlineNotifications() {
+      if (Notification.permission !== 'granted') return;
+
+      const t = today();
+      const tm = tomorrow();
+
+      tasks.forEach(task => {
+        // 完了済み・期限なし・通知済みはスキップ
+        if (task.done)              return;
+        if (!task.deadline)         return;
+        if (notifiedIds.has(task.id)) return;
+
+        let message = null;
+        if (task.deadline === t) {
+          message = `⏰ 今日が期限です：${task.text}`;
+        } else if (task.deadline === tm) {
+          message = `📅 明日が期限です：${task.text}`;
+        }
+
+        if (message) {
+          // 通知を表示する
+          new Notification('ToDoアプリ', {
+            body: message,
+            icon: './icon.svg',   // アプリのアイコン
+          });
+          // 通知済みとして記録（同じタブで2回出ないようにする）
+          notifiedIds.add(task.id);
+        }
+      });
+    }
+
     // --- ユーティリティ ---
     function today() {
       return new Date().toISOString().slice(0, 10);
@@ -965,9 +1026,12 @@
     // ============================================================
     col.orderBy('createdAt', 'asc').onSnapshot(
       snapshot => {
-        // docs の配列を { id, text, done, deadline, createdAt } の形に変換
+        // docs の配列を { id, text, done, deadline, category, createdAt } の形に変換
         tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         render();
+        // タスクが読み込まれるたびに期限チェックを行う
+        // notifiedIds に記録済みのタスクは通知されないので重複しない
+        checkDeadlineNotifications();
       },
       err => {
         // 接続エラー時（設定ミス・ネットワーク断など）はメッセージを表示
@@ -976,6 +1040,10 @@
           '<p class="empty">接続エラー。Firebase の設定を確認してください。</p>';
       }
     );
+
+    // ページを開いたとき、通知許可をリクエストする
+    // 許可されていれば、タスク読み込み後（onSnapshot内）に自動で通知チェックが走る
+    requestNotificationPermission();
 
     // PWA: Service Worker を登録してオフライン対応を有効化
     if ('serviceWorker' in navigator) {
