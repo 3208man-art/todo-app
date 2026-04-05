@@ -700,6 +700,40 @@
       }
     }
 
+    // ============================================================
+    // 通知を表示する（Service Worker 経由）
+    //
+    // 【なぜ new Notification() ではなく showNotification() を使うのか？】
+    //
+    // new Notification()
+    //   → ブラウザのタブが直接通知を出す方法。
+    //     PCのChromeでは動くが、スマホPWAでは動かないことがある。
+    //
+    // registration.showNotification()
+    //   → Service Worker（アプリの裏で動く管理役）経由で通知を出す方法。
+    //     スマホPWAでも安定して動き、Android Chromeでの対応が確実。
+    //     PWAの標準的な通知の出し方。
+    //
+    // navigator.serviceWorker.ready
+    //   → Service Worker の準備が完了するまで待ってから通知を出す。
+    //     準備前に呼ぶとエラーになるため、必ず ready で待つ。
+    // ============================================================
+    async function showNotification(title, body) {
+      // Service Worker に対応していない環境ではフォールバックとして
+      // new Notification() を使う（PCの古いブラウザ向け）
+      if (!('serviceWorker' in navigator)) {
+        new Notification(title, { body, icon: './icon.svg' });
+        return;
+      }
+      // Service Worker の準備が整うまで待ってから通知を表示する
+      const registration = await navigator.serviceWorker.ready;
+      registration.showNotification(title, {
+        body,
+        icon: './icon.svg',  // 通知に表示するアイコン
+        badge: './icon.svg', // Androidのステータスバーに表示される小アイコン
+      });
+    }
+
     // 期限が今日・明日の未完了タスクを通知する
     function checkDeadlineNotifications() {
       if (Notification.permission !== 'granted') return;
@@ -709,8 +743,8 @@
 
       tasks.forEach(task => {
         // 完了済み・期限なし・通知済みはスキップ
-        if (task.done)              return;
-        if (!task.deadline)         return;
+        if (task.done)               return;
+        if (!task.deadline)          return;
         if (notifiedIds.has(task.id)) return;
 
         let message = null;
@@ -721,11 +755,8 @@
         }
 
         if (message) {
-          // 通知を表示する
-          new Notification('ToDoアプリ', {
-            body: message,
-            icon: './icon.svg',   // アプリのアイコン
-          });
+          // Service Worker 経由で通知を表示する（スマホPWAでも動く）
+          showNotification('ToDoアプリ', message);
           // 通知済みとして記録（同じタブで2回出ないようにする）
           notifiedIds.add(task.id);
         }
