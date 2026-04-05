@@ -294,11 +294,23 @@
       color: #0d3b52;
       word-break: break-word;
       transition: color 0.2s;
+      cursor: pointer;
+    }
+
+    .task-text:hover {
+      color: #0a2e40;
+      text-decoration: underline dotted #a0c4d4;
     }
 
     li.done .task-text {
       text-decoration: line-through;
       color: #a0c4d4;
+    }
+
+    li.done .task-text:hover {
+      color: #a0c4d4;
+      text-decoration: none;
+      cursor: default;
     }
 
     /* 期限バッジ */
@@ -332,22 +344,6 @@
       background: #f0f0f0;
       color: #bbb;
       text-decoration: none;
-    }
-
-    /* タスクテキスト：クリックで編集できることを示す */
-    .task-text {
-      cursor: pointer;
-    }
-
-    .task-text:hover {
-      color: #0a2e40;
-      text-decoration: underline dotted #a0c4d4;
-    }
-
-    li.done .task-text:hover {
-      color: #a0c4d4;
-      text-decoration: none;
-      cursor: default;
     }
 
     /* --- 編集フォーム --- */
@@ -496,18 +492,51 @@
     <ul id="todo-list"></ul>
   </div>
 
+  <!-- Firebase SDK (compat版: 従来の書き方で使える) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
   <script>
+    // ============================================================
+    // Firebase の設定（Firebase Console から取得したもの）
+    // ============================================================
+    const firebaseConfig = {
+      apiKey:            "AIzaSyBAAiBxlg3PkACQLP2c6DrHL5GlGQfKHNk",
+      authDomain:        "todo-app-6cc94.firebaseapp.com",
+      projectId:         "todo-app-6cc94",
+      storageBucket:     "todo-app-6cc94.firebasestorage.app",
+      messagingSenderId: "640678519573",
+      appId:             "1:640678519573:web:909f5578e9eec3e10a7f1c"
+    };
+
+    // Firebase を起動する
+    firebase.initializeApp(firebaseConfig);
+
+    // Firestore（データベース）への接続を取得する
+    const db  = firebase.firestore();
+
+    // 'tasks' というコレクション（テーブルのようなもの）を操作する
+    const col = db.collection('tasks');
+
+    // オフライン中でも読み書きできるようにローカルキャッシュを有効化
+    // （ネット復帰時に自動で Firestore へ同期される）
+    db.enablePersistence().catch(() => {});
+
+    // ============================================================
+
     const input     = document.getElementById('task-input');
     const dateInput = document.getElementById('date-input');
-    const list      = document.getElementById('stats');
     const statsEl   = document.getElementById('stats');
     const todoList  = document.getElementById('todo-list');
 
-    // 現在編集中のタスクの元インデックス（null = 編集中なし）
-    let currentEditIndex = null;
+    // メモリ上のタスク一覧（Firestoreのスナップショットで常に最新に保つ）
+    let tasks = [];
+    // 現在編集中のタスクID（null = 編集中なし）
+    let currentEditId = null;
 
+    // --- ユーティリティ ---
     function today() {
-      return new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+      return new Date().toISOString().slice(0, 10);
     }
 
     function tomorrow() {
@@ -525,23 +554,28 @@
 
     function formatDate(dateStr) {
       if (!dateStr) return '';
-      const [y, m, d] = dateStr.split('-');
+      const [, m, d] = dateStr.split('-');
       const t = today();
-      if (dateStr === t)         return '今日まで';
-      if (dateStr === tomorrow()) return '明日まで';
-      if (dateStr < t)           return `${m}/${d} 期限切れ`;
+      if (dateStr === t)          return '今日まで';
+      if (dateStr === tomorrow())  return '明日まで';
+      if (dateStr < t)            return `${m}/${d} 期限切れ`;
       return `${m}/${d} まで`;
     }
 
-    function loadTasks() {
-      return JSON.parse(localStorage.getItem('tasks') || '[]');
+    // --- 並び替え（未完了・期限近い順 → 未完了・期限なし → 完了） ---
+    function sortTasks(list) {
+      return [...list].sort((a, b) => {
+        if (a.done !== b.done) return a.done ? 1 : -1;
+        const da = a.deadline, db = b.deadline;
+        if (!da && !db) return 0;
+        if (!da) return 1;
+        if (!db) return -1;
+        return da < db ? -1 : da > db ? 1 : 0;
+      });
     }
 
-    function saveTasks(tasks) {
-      localStorage.setItem('tasks', JSON.stringify(tasks));
-    }
-
-    function renderStats(tasks) {
+    // --- 統計 ---
+    function renderStats() {
       const done  = tasks.filter(t => t.done).length;
       const total = tasks.length;
       statsEl.innerHTML = total === 0 ? '' :
@@ -550,58 +584,37 @@
          <span class="stat">残り <span>${total - done}</span></span>`;
     }
 
-    // タスクを「未完了・期限近い順 → 未完了・期限なし → 完了」の順に並べる
-    function sortTasks(tasks) {
-      // 各タスクに元のインデックスを添付してから並び替え
-      return tasks
-        .map((task, i) => ({ task, i }))
-        .sort((a, b) => {
-          // 完了は未完了の後ろへ
-          if (a.task.done !== b.task.done) return a.task.done ? 1 : -1;
-
-          const da = a.task.deadline;
-          const db = b.task.deadline;
-
-          // 両方期限なし → 順不同
-          if (!da && !db) return 0;
-          // 片方だけ期限なし → 期限ありを前へ
-          if (!da) return 1;
-          if (!db) return -1;
-          // 両方期限あり → 日付が近い方を前へ
-          return da < db ? -1 : da > db ? 1 : 0;
-        });
-    }
-
+    // --- 描画 ---
     function render() {
-      const tasks = loadTasks();
       todoList.innerHTML = '';
-      renderStats(tasks);
+      renderStats();
 
       if (tasks.length === 0) {
         todoList.innerHTML = '<p class="empty">タスクがありません</p>';
         return;
       }
 
-      sortTasks(tasks).forEach(({ task, i }) => {
-        const status = deadlineStatus(task.deadline);
-        const li = document.createElement('li');
-        const isEditing = (i === currentEditIndex);
+      sortTasks(tasks).forEach(task => {
+        const { id } = task;
+        const status    = deadlineStatus(task.deadline);
+        const isEditing = (id === currentEditId);
 
+        const li = document.createElement('li');
         if (isEditing) {
           li.classList.add('editing');
         } else {
-          if (task.done) li.classList.add('done');
+          if (task.done)                li.classList.add('done');
           else if (status === 'overdue')  li.classList.add('overdue');
           else if (status === 'due-soon') li.classList.add('due-soon');
         }
 
-        // チェックボックス（編集中は操作不可にしない）
+        // チェックボックス
         const wrap = document.createElement('label');
         wrap.className = 'checkbox-wrap';
         const cb = document.createElement('input');
         cb.type = 'checkbox';
         cb.checked = task.done;
-        cb.addEventListener('change', () => toggleTask(i));
+        cb.addEventListener('change', () => toggleTask(id, task.done));
         const box = document.createElement('span');
         box.className = 'box';
         wrap.append(cb, box);
@@ -637,15 +650,14 @@
 
           form.append(editText, deadlineRow, actions);
 
-          // 保存処理
           const doSave = () => {
             const newText = editText.value.trim();
             if (!newText) return;
-            saveEdit(i, newText, editDate.value || null);
+            saveEdit(id, newText, editDate.value || null);
           };
           saveBtn.addEventListener('click', doSave);
           editText.addEventListener('keydown', e => {
-            if (e.key === 'Enter') doSave();
+            if (e.key === 'Enter')  doSave();
             if (e.key === 'Escape') cancelEdit();
           });
           editDate.addEventListener('keydown', e => {
@@ -654,7 +666,6 @@
           cancelBtn.addEventListener('click', cancelEdit);
 
           li.append(wrap, form);
-          // 描画後にテキスト入力へフォーカス
           requestAnimationFrame(() => editText.focus());
 
         } else {
@@ -666,9 +677,8 @@
           span.className = 'task-text';
           span.textContent = task.text;
           span.title = 'クリックして編集';
-          // 完了済みは編集不可
           if (!task.done) {
-            span.addEventListener('click', () => startEdit(i));
+            span.addEventListener('click', () => startEdit(id));
           }
           body.appendChild(span);
 
@@ -683,7 +693,7 @@
           btn.className = 'delete-btn';
           btn.innerHTML = '&#10005;';
           btn.title = '削除';
-          btn.addEventListener('click', () => deleteTask(i));
+          btn.addEventListener('click', () => deleteTask(id));
 
           li.append(wrap, body, btn);
         }
@@ -692,15 +702,41 @@
       });
     }
 
+    // --- CRUD（Firestore） ---
     function addTask() {
       const text = input.value.trim();
       if (!text) return;
-
-      const tasks = loadTasks();
-      tasks.push({ text, done: false, deadline: dateInput.value || null });
-      saveTasks(tasks);
-      input.value = '';
+      col.add({
+        text,
+        done:      false,
+        deadline:  dateInput.value || null,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      input.value    = '';
       dateInput.value = '';
+    }
+
+    function deleteTask(id) {
+      col.doc(id).delete();
+    }
+
+    function toggleTask(id, currentDone) {
+      col.doc(id).update({ done: !currentDone });
+    }
+
+    function startEdit(id) {
+      currentEditId = id;
+      render();
+    }
+
+    function saveEdit(id, newText, newDeadline) {
+      col.doc(id).update({ text: newText, deadline: newDeadline });
+      currentEditId = null;
+      // render() は onSnapshot が自動で呼ぶ
+    }
+
+    function cancelEdit() {
+      currentEditId = null;
       render();
     }
 
@@ -708,44 +744,24 @@
       dateInput.value = '';
     }
 
-    function startEdit(index) {
-      currentEditIndex = index;
-      render();
-    }
-
-    function saveEdit(index, newText, newDeadline) {
-      const tasks = loadTasks();
-      tasks[index].text     = newText;
-      tasks[index].deadline = newDeadline;
-      saveTasks(tasks);
-      currentEditIndex = null;
-      render();
-    }
-
-    function cancelEdit() {
-      currentEditIndex = null;
-      render();
-    }
-
-    function deleteTask(index) {
-      const tasks = loadTasks();
-      tasks.splice(index, 1);
-      saveTasks(tasks);
-      render();
-    }
-
-    function toggleTask(index) {
-      const tasks = loadTasks();
-      tasks[index].done = !tasks[index].done;
-      saveTasks(tasks);
-      render();
-    }
-
+    // Enter キーでタスク追加
     input.addEventListener('keydown', e => {
       if (e.key === 'Enter') addTask();
     });
 
-    render();
+    // --- Firestore リアルタイムリスナー ---
+    // Firestore のデータが変わるたびに自動で render() が呼ばれる
+    col.orderBy('createdAt', 'asc').onSnapshot(
+      snapshot => {
+        tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        render();
+      },
+      err => {
+        console.error('Firestore error:', err);
+        todoList.innerHTML =
+          '<p class="empty">接続エラー。Firebase の設定を確認してください。</p>';
+      }
+    );
 
     // PWA: Service Worker を登録してオフライン対応を有効化
     if ('serviceWorker' in navigator) {
