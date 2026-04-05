@@ -435,6 +435,28 @@
          <span class="stat">残り <span>${total - done}</span></span>`;
     }
 
+    // タスクを「未完了・期限近い順 → 未完了・期限なし → 完了」の順に並べる
+    function sortTasks(tasks) {
+      // 各タスクに元のインデックスを添付してから並び替え
+      return tasks
+        .map((task, i) => ({ task, i }))
+        .sort((a, b) => {
+          // 完了は未完了の後ろへ
+          if (a.task.done !== b.task.done) return a.task.done ? 1 : -1;
+
+          const da = a.task.deadline;
+          const db = b.task.deadline;
+
+          // 両方期限なし → 順不同
+          if (!da && !db) return 0;
+          // 片方だけ期限なし → 期限ありを前へ
+          if (!da) return 1;
+          if (!db) return -1;
+          // 両方期限あり → 日付が近い方を前へ
+          return da < db ? -1 : da > db ? 1 : 0;
+        });
+    }
+
     function render() {
       const tasks = loadTasks();
       todoList.innerHTML = '';
@@ -445,7 +467,7 @@
         return;
       }
 
-      tasks.forEach((task, i) => {
+      sortTasks(tasks).forEach(({ task, i }) => {
         const status = deadlineStatus(task.deadline);
         const li = document.createElement('li');
         if (task.done) li.classList.add('done');
