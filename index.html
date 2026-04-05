@@ -467,6 +467,120 @@
       font-size: 0.88rem;
       padding: 28px 0;
     }
+
+    /* --- カテゴリ選択行 --- */
+    .category-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .category-row label {
+      font-size: 0.82rem;
+      color: #5a8fa3;
+      white-space: nowrap;
+    }
+
+    .category-row select {
+      flex: 1;
+      padding: 8px 12px;
+      background: #fff;
+      border: 1.5px solid #b2dce8;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      font-family: inherit;
+      color: #0d3b52;
+      outline: none;
+      cursor: pointer;
+      transition: border-color 0.2s;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235a8fa3' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 32px;
+    }
+
+    .category-row select:focus {
+      border-color: #0d3b52;
+    }
+
+    /* --- カテゴリバッジ --- */
+    .category-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 20px;
+      width: fit-content;
+      letter-spacing: 0.01em;
+    }
+
+    /* 仕事: ブルー系 */
+    .category-badge.cat-work {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+
+    /* 買い物: グリーン系 */
+    .category-badge.cat-shopping {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    /* 運動: オレンジ系 */
+    .category-badge.cat-exercise {
+      background: #ffedd5;
+      color: #9a3412;
+    }
+
+    /* その他: グレー系 */
+    .category-badge.cat-other {
+      background: #f1f5f9;
+      color: #475569;
+    }
+
+    /* 完了タスクのカテゴリバッジはグレーアウト */
+    li.done .category-badge {
+      background: #f0f0f0;
+      color: #bbb;
+    }
+
+    /* --- 編集フォーム内カテゴリ選択 --- */
+    .edit-category-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .edit-category-row label {
+      font-size: 0.78rem;
+      color: #5a8fa3;
+      white-space: nowrap;
+    }
+
+    .edit-category-row select {
+      flex: 1;
+      padding: 6px 10px;
+      background: #fff;
+      border: 1.5px solid #b2dce8;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      font-family: inherit;
+      color: #0d3b52;
+      outline: none;
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235a8fa3' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      padding-right: 28px;
+    }
+
+    .edit-category-row select:focus {
+      border-color: #0d3b52;
+    }
   </style>
 </head>
 <body>
@@ -485,6 +599,15 @@
         <label for="date-input">期限</label>
         <input type="date" id="date-input">
         <button class="clear-date" onclick="clearDate()" title="期限をクリア">&#10005;</button>
+      </div>
+      <div class="category-row">
+        <label for="category-input">カテゴリ</label>
+        <select id="category-input">
+          <option value="work">仕事</option>
+          <option value="shopping">買い物</option>
+          <option value="exercise">運動</option>
+          <option value="other" selected>その他</option>
+        </select>
       </div>
     </div>
 
@@ -524,10 +647,24 @@
 
     // ============================================================
 
-    const input     = document.getElementById('task-input');
-    const dateInput = document.getElementById('date-input');
-    const statsEl   = document.getElementById('stats');
-    const todoList  = document.getElementById('todo-list');
+    const input         = document.getElementById('task-input');
+    const dateInput     = document.getElementById('date-input');
+    const categoryInput = document.getElementById('category-input');
+    const statsEl       = document.getElementById('stats');
+    const todoList      = document.getElementById('todo-list');
+
+    // ============================================================
+    // カテゴリ定義
+    // key    : Firestore に保存する値（英字）
+    // label  : 画面に表示する日本語名
+    // cssClass: バッジに付けるCSSクラス名
+    // ============================================================
+    const CATEGORIES = {
+      work:     { label: '仕事',  cssClass: 'cat-work'     },
+      shopping: { label: '買い物', cssClass: 'cat-shopping' },
+      exercise: { label: '運動',  cssClass: 'cat-exercise' },
+      other:    { label: 'その他', cssClass: 'cat-other'    },
+    };
 
     // メモリ上のタスク一覧（Firestoreのスナップショットで常に最新に保つ）
     let tasks = [];
@@ -624,11 +761,13 @@
           const form = document.createElement('div');
           form.className = 'edit-form';
 
+          // テキスト入力
           const editText = document.createElement('input');
           editText.type = 'text';
           editText.value = task.text;
           editText.maxLength = 200;
 
+          // 期限入力行
           const deadlineRow = document.createElement('div');
           deadlineRow.className = 'edit-deadline-row';
           const dlLabel = document.createElement('label');
@@ -638,6 +777,22 @@
           editDate.value = task.deadline || '';
           deadlineRow.append(dlLabel, editDate);
 
+          // カテゴリ選択行（編集時も変更できる）
+          const catRow = document.createElement('div');
+          catRow.className = 'edit-category-row';
+          const catLabel = document.createElement('label');
+          catLabel.textContent = 'カテゴリ';
+          const editCat = document.createElement('select');
+          Object.entries(CATEGORIES).forEach(([key, { label }]) => {
+            const opt = document.createElement('option');
+            opt.value = key;
+            opt.textContent = label;
+            if (key === (task.category || 'other')) opt.selected = true;
+            editCat.appendChild(opt);
+          });
+          catRow.append(catLabel, editCat);
+
+          // 保存・キャンセルボタン
           const actions = document.createElement('div');
           actions.className = 'edit-actions';
           const saveBtn = document.createElement('button');
@@ -648,12 +803,13 @@
           cancelBtn.textContent = 'キャンセル';
           actions.append(saveBtn, cancelBtn);
 
-          form.append(editText, deadlineRow, actions);
+          form.append(editText, deadlineRow, catRow, actions);
 
+          // 保存処理：テキスト・期限・カテゴリを Firestore へ update
           const doSave = () => {
             const newText = editText.value.trim();
             if (!newText) return;
-            saveEdit(id, newText, editDate.value || null);
+            saveEdit(id, newText, editDate.value || null, editCat.value);
           };
           saveBtn.addEventListener('click', doSave);
           editText.addEventListener('keydown', e => {
@@ -673,6 +829,7 @@
           const body = document.createElement('div');
           body.className = 'task-body';
 
+          // タスク名（クリックで編集モードへ）
           const span = document.createElement('span');
           span.className = 'task-text';
           span.textContent = task.text;
@@ -682,13 +839,29 @@
           }
           body.appendChild(span);
 
+          // バッジ行（カテゴリ + 期限を横並びで表示）
+          const badgeRow = document.createElement('div');
+          badgeRow.style.cssText = 'display:flex;gap:4px;flex-wrap:wrap;';
+
+          // カテゴリバッジ
+          const cat = CATEGORIES[task.category] || CATEGORIES.other;
+          const catBadge = document.createElement('span');
+          // 完了済みはグレー（CSSで制御）、未完了はカテゴリ色
+          catBadge.className = 'category-badge ' + cat.cssClass;
+          catBadge.textContent = cat.label;
+          badgeRow.appendChild(catBadge);
+
+          // 期限バッジ（期限があるときだけ表示）
           if (task.deadline) {
-            const badge = document.createElement('span');
-            badge.className = 'deadline-badge ' + (task.done ? 'done-badge' : (status || 'normal'));
-            badge.textContent = formatDate(task.deadline);
-            body.appendChild(badge);
+            const dlBadge = document.createElement('span');
+            dlBadge.className = 'deadline-badge ' + (task.done ? 'done-badge' : (status || 'normal'));
+            dlBadge.textContent = formatDate(task.deadline);
+            badgeRow.appendChild(dlBadge);
           }
 
+          body.appendChild(badgeRow);
+
+          // 削除ボタン
           const btn = document.createElement('button');
           btn.className = 'delete-btn';
           btn.innerHTML = '&#10005;';
@@ -702,44 +875,71 @@
       });
     }
 
-    // --- CRUD（Firestore） ---
+    // ============================================================
+    // Firestore CRUD 操作
+    //
+    // 「CRUD」とは Create（作成）/ Read（読込）/ Update（更新）/ Delete（削除）の略。
+    // col.add()    → Firestore にドキュメント（1件のデータ）を新規追加
+    // col.doc(id)  → id で指定したドキュメントを取得
+    //   .update()  → 指定フィールドだけ上書き（他は変えない）
+    //   .delete()  → ドキュメントを丸ごと削除
+    // ============================================================
+
+    // 【追加】新しいタスクを Firestore に保存する
     function addTask() {
       const text = input.value.trim();
-      if (!text) return;
+      if (!text) return; // 空欄のときは何もしない
+
+      // col.add() で 'tasks' コレクションに1件追加
+      // createdAt は Firestore のサーバー時刻を自動でセット（並び順に使う）
       col.add({
         text,
         done:      false,
         deadline:  dateInput.value || null,
+        category:  categoryInput.value,   // 選択されたカテゴリを保存
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
-      input.value    = '';
-      dateInput.value = '';
+
+      // 入力欄をリセット（画面更新は onSnapshot が自動でやってくれる）
+      input.value         = '';
+      dateInput.value     = '';
+      categoryInput.value = 'other'; // カテゴリを「その他」に戻す
     }
 
+    // 【削除】指定 id のタスクを Firestore から削除する
     function deleteTask(id) {
+      // col.doc(id) で対象ドキュメントを指定し .delete() で削除
       col.doc(id).delete();
+      // 削除後の画面更新も onSnapshot が自動で行う
     }
 
+    // 【完了トグル】チェックボックスのオン/オフを Firestore に反映する
     function toggleTask(id, currentDone) {
+      // done フィールドだけ反転して update（他のフィールドはそのまま）
       col.doc(id).update({ done: !currentDone });
     }
 
+    // 【編集開始】タスク名をクリックしたとき編集モードに切り替える
     function startEdit(id) {
-      currentEditId = id;
-      render();
+      currentEditId = id; // 編集中のタスクIDを記憶
+      render();           // 画面を再描画（編集フォームが表示される）
     }
 
-    function saveEdit(id, newText, newDeadline) {
-      col.doc(id).update({ text: newText, deadline: newDeadline });
+    // 【編集保存】編集フォームの内容を Firestore に update する
+    function saveEdit(id, newText, newDeadline, newCategory) {
+      // text・deadline・category の3フィールドを上書き
+      col.doc(id).update({ text: newText, deadline: newDeadline, category: newCategory });
       currentEditId = null;
-      // render() は onSnapshot が自動で呼ぶ
+      // render() は onSnapshot が検知して自動で呼び出す
     }
 
+    // 【編集キャンセル】変更を破棄して通常表示に戻す
     function cancelEdit() {
       currentEditId = null;
-      render();
+      render(); // Firestore は変えていないのでそのまま再描画
     }
 
+    // 期限入力欄をリセットする
     function clearDate() {
       dateInput.value = '';
     }
@@ -749,14 +949,28 @@
       if (e.key === 'Enter') addTask();
     });
 
-    // --- Firestore リアルタイムリスナー ---
-    // Firestore のデータが変わるたびに自動で render() が呼ばれる
+    // ============================================================
+    // Firestore リアルタイムリスナー（onSnapshot）
+    //
+    // onSnapshot は「Firestore のデータが変わったら教えて」と登録する仕組み。
+    // 自分の操作だけでなく、別のPC・スマホでの変更も即座に反映される。
+    //
+    // 処理の流れ：
+    //   1. Firestore の 'tasks' コレクションを createdAt 昇順で監視
+    //   2. 変化があるたびに snapshot（最新データの一覧）が届く
+    //   3. tasks 配列を更新して render() を呼び、画面を再描画
+    //
+    // ★ id: doc.id で Firestore のドキュメントIDを各タスクに持たせている
+    //    → これがあるから update / delete で正しいドキュメントを特定できる
+    // ============================================================
     col.orderBy('createdAt', 'asc').onSnapshot(
       snapshot => {
+        // docs の配列を { id, text, done, deadline, createdAt } の形に変換
         tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         render();
       },
       err => {
+        // 接続エラー時（設定ミス・ネットワーク断など）はメッセージを表示
         console.error('Firestore error:', err);
         todoList.innerHTML =
           '<p class="empty">接続エラー。Firebase の設定を確認してください。</p>';
