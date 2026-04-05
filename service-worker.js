@@ -1,4 +1,5 @@
-const CACHE_NAME = 'todo-app-v1';
+// ★ バージョンを上げるたびにここを変更する（例: v2 → v3）
+const CACHE_NAME = 'todo-app-v2';
 
 // キャッシュするファイルの一覧
 const ASSETS = [
@@ -6,26 +7,28 @@ const ASSETS = [
   './manifest.json'
 ];
 
-// --- インストール時: 必要なファイルをキャッシュに保存 ---
+// --- インストール時: 必要なファイルをキャッシュに保存してすぐ有効化 ---
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(ASSETS))
+      .then(() => self.skipWaiting()) // キャッシュ完了後にすぐ新しいSWへ切り替え
   );
-  self.skipWaiting();
 });
 
-// --- アクティベート時: 古いキャッシュを削除 ---
+// --- アクティベート時: 古いキャッシュを削除してすべてのタブを制御下に置く ---
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(
-        keys
-          .filter(key => key !== CACHE_NAME)
-          .map(key => caches.delete(key))
+    caches.keys()
+      .then(keys =>
+        Promise.all(
+          keys
+            .filter(key => key !== CACHE_NAME) // 現バージョン以外を削除
+            .map(key => caches.delete(key))
+        )
       )
-    )
+      .then(() => self.clients.claim()) // 古いSWが管理していたタブも即座に引き継ぐ
   );
-  self.clients.claim();
 });
 
 // --- フェッチ時: キャッシュ優先、なければネットワーク ---
