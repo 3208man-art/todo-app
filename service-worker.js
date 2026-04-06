@@ -1,5 +1,5 @@
 // ★ アプリを更新したらここの番号を1つ上げる（例: v5 → v6）
-const CACHE_NAME = 'todo-app-v13';
+const CACHE_NAME = 'todo-app-v14';
 
 // キャッシュするファイルの一覧
 const ASSETS = [
