@@ -1636,17 +1636,57 @@
 
     // 【編集開始】タスク名をクリックしたとき編集モードに切り替える
     function startEdit(id) {
-      currentEditId = id; // 編集中のタスクIDを記憶
+      currentEditId = id; // 編集中のタスクIDを記憶（Firestore の document id）
       render();           // 画面を再描画（編集フォームが表示される）
+    }
+
+    // ============================================================
+    // 編集フォームの値の退避・復元
+    //
+    // 【なぜ必要か？】
+    // 編集中に onSnapshot が割り込むと render() が呼ばれ、
+    // フォームが Firestore の保存済み値で再構築されてしまう。
+    // → ユーザーが入力中の内容が消える（PC で起きやすい問題）
+    //
+    // captureEditForm() : 現在のフォーム入力値をオブジェクトに保存
+    // restoreEditForm() : render() 後に値を書き戻す
+    // ============================================================
+    function captureEditForm() {
+      const form = document.querySelector('#todo-list .edit-form');
+      if (!form) return null;
+      return {
+        text: form.querySelector('input[type="text"]')?.value  ?? '',
+        date: form.querySelector('input[type="date"]')?.value  ?? '',
+        cat:  form.querySelector('select')?.value              ?? 'other',
+      };
+    }
+
+    function restoreEditForm(saved) {
+      if (!saved) return;
+      const form = document.querySelector('#todo-list .edit-form');
+      if (!form) return;
+      const tf = form.querySelector('input[type="text"]');
+      const df = form.querySelector('input[type="date"]');
+      const sf = form.querySelector('select');
+      if (tf) tf.value = saved.text;
+      if (df) df.value = saved.date;
+      if (sf) sf.value = saved.cat;
     }
 
     // 【編集保存】編集フォームの内容を Firestore に update する
     function saveEdit(id, newText, newDeadline, newCategory) {
-      // text・deadline・category の3フィールドを上書き
-      col.doc(id).update({ text: newText, deadline: newDeadline, category: newCategory })
-        .catch(() => showError('タスクの保存に失敗しました'));
+      // currentEditId を先に null にする
+      // → 保存後に onSnapshot が来たとき render() が通常モードで描画される
       currentEditId = null;
-      // render() は onSnapshot が検知して自動で呼び出す
+
+      // Firestore の document id を使って更新（配列 index は使わない）
+      col.doc(id).update({ text: newText, deadline: newDeadline, category: newCategory })
+        .catch(() => {
+          // 保存失敗時：エラーを表示して画面を正しい状態に戻す
+          showError('タスクの保存に失敗しました');
+          render();
+        });
+      // 成功時は onSnapshot が自動で render() を呼び出す（手動 render 不要）
     }
 
     // 【編集キャンセル】変更を破棄して通常表示に戻す
@@ -1727,7 +1767,26 @@
             document.getElementById('loading-indicator').style.display = 'none';
           }
           tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          render();
+
+          // ============================================================
+          // 編集中に onSnapshot が割り込んだ場合の対策
+          //
+          // 問題：onSnapshot → render() でフォームが再構築されると、
+          //        ユーザーが入力中のテキストが Firestore の保存済み値で
+          //        上書きされてしまう（PC で別タブ・別デバイスがあると発生）
+          //
+          // 対策：編集中(currentEditId が null でない)なら、
+          //        render() の前後でフォームの値を退避・復元する。
+          //        これにより入力中の内容が消えなくなる。
+          // ============================================================
+          if (currentEditId) {
+            const savedEdit = captureEditForm(); // 入力中の値を退避
+            render();
+            restoreEditForm(savedEdit);          // render() 後に値を書き戻す
+          } else {
+            render();
+          }
+
           checkDeadlineNotifications();
         },
         err => {
