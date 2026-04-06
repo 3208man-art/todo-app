@@ -522,6 +522,30 @@
       color: #e0f7fa;
     }
 
+    /* --- 並び替えセレクト --- */
+    .sort-select {
+      flex: 1;
+      padding: 5px 30px 5px 12px;
+      background: #fff;
+      border: 1.5px solid #b2dce8;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-family: inherit;
+      font-weight: 500;
+      color: #0d3b52;
+      outline: none;
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235a8fa3' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      transition: border-color 0.15s;
+    }
+
+    .sort-select:focus {
+      border-color: #0d3b52;
+    }
+
     /* フィルターで0件になったとき */
     .filter-empty {
       text-align: center;
@@ -693,6 +717,15 @@
           <button class="filter-btn" data-status="done">完了</button>
         </div>
       </div>
+      <div class="filter-row">
+        <label>並び順</label>
+        <select id="sort-select" class="sort-select">
+          <option value="deadline-asc">期限が近い順</option>
+          <option value="deadline-desc">期限が遠い順</option>
+          <option value="undone-first">未完了優先</option>
+          <option value="created-desc">作成が新しい順</option>
+        </select>
+      </div>
     </div>
 
     <div class="stats" id="stats"></div>
@@ -762,6 +795,7 @@
     // ============================================================
     let filterCat    = 'all'; // 'all' | 'work' | 'shopping' | 'exercise' | 'other'
     let filterStatus = 'all'; // 'all' | 'active'（未完了） | 'done'（完了）
+    let sortOrder    = 'deadline-asc'; // 現在の並び順（セレクトの value と対応）
 
     // フィルターを適用してタスクを絞り込む
     function applyFilter(list) {
@@ -901,14 +935,52 @@
     }
 
     // --- 並び替え（未完了・期限近い順 → 未完了・期限なし → 完了） ---
+    // ============================================================
+    // 並び替え
+    //
+    // sortOrder の値に応じて4種類の並び順を切り替える。
+    // どの順番でも「期限なし」は期限ありタスクより後ろに回す。
+    // ============================================================
     function sortTasks(list) {
       return [...list].sort((a, b) => {
-        if (a.done !== b.done) return a.done ? 1 : -1;
-        const da = a.deadline, db = b.deadline;
-        if (!da && !db) return 0;
-        if (!da) return 1;
-        if (!db) return -1;
-        return da < db ? -1 : da > db ? 1 : 0;
+        const da = a.deadline ?? null;  // null = 期限なし
+        const db = b.deadline ?? null;
+
+        if (sortOrder === 'deadline-asc') {
+          // 期限が近い順：未完了優先 → 期限あり昇順 → 期限なし
+          if (a.done !== b.done) return a.done ? 1 : -1;
+          if (!da && !db) return 0;
+          if (!da) return 1;
+          if (!db) return -1;
+          return da < db ? -1 : da > db ? 1 : 0;
+        }
+
+        if (sortOrder === 'deadline-desc') {
+          // 期限が遠い順：未完了優先 → 期限あり降順 → 期限なし
+          if (a.done !== b.done) return a.done ? 1 : -1;
+          if (!da && !db) return 0;
+          if (!da) return 1;
+          if (!db) return -1;
+          return da > db ? -1 : da < db ? 1 : 0;
+        }
+
+        if (sortOrder === 'undone-first') {
+          // 未完了優先：完了/未完了を分けるだけ（同グループ内は期限近い順）
+          if (a.done !== b.done) return a.done ? 1 : -1;
+          if (!da && !db) return 0;
+          if (!da) return 1;
+          if (!db) return -1;
+          return da < db ? -1 : da > db ? 1 : 0;
+        }
+
+        if (sortOrder === 'created-desc') {
+          // 作成が新しい順：createdAt の降順（Firestore の Timestamp を比較）
+          const ta = a.createdAt?.seconds ?? 0;
+          const tb = b.createdAt?.seconds ?? 0;
+          return tb - ta;
+        }
+
+        return 0;
       });
     }
 
@@ -1188,6 +1260,13 @@
         .forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       filterStatus = btn.dataset.status; // data-status 属性の値を取得
+      render();
+    });
+
+    // 並び替えセレクト
+    // 選択が変わるたびに sortOrder を更新して再描画する
+    document.getElementById('sort-select').addEventListener('change', e => {
+      sortOrder = e.target.value; // セレクトの選択値を取得
       render();
     });
 
