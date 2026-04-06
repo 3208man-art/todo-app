@@ -905,6 +905,39 @@
         font-size: 0.88rem;
       }
     }
+
+    /* --- トースト通知 ---
+     * position:fixed で画面下に固定。
+     * .show クラスが付いたとき opacity と transform でフェードイン。
+     * z-index:9999 で他の要素より前面に出る。
+     */
+    #toast {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%) translateY(12px);
+      background: #b0261e;
+      color: #fff;
+      padding: 12px 22px;
+      border-radius: 14px;
+      font-size: 0.88rem;
+      font-weight: 500;
+      font-family: 'Inter', 'Segoe UI', sans-serif;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.28);
+      opacity: 0;
+      transition: opacity 0.22s ease, transform 0.22s ease;
+      pointer-events: none; /* クリックを透過させてUIを邪魔しない */
+      max-width: min(420px, calc(100vw - 32px));
+      text-align: center;
+      z-index: 9999;
+      line-height: 1.5;
+    }
+
+    /* トーストを表示するときに付けるクラス */
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
   </style>
 </head>
 <body>
@@ -1007,6 +1040,9 @@
     </div><!-- /app-screen -->
   </div>
 
+  <!-- トースト通知（エラー時に画面下に表示される） -->
+  <div id="toast"></div>
+
   <!-- Firebase SDK (compat版: 従来の書き方で使える) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -1048,6 +1084,32 @@
     let col = null;          // ログイン後に設定する
     let unsubscribe = null;  // onSnapshot の解除関数
     let isFirstLoad = false; // 最初のデータ取得前かどうか
+
+    // ============================================================
+    // トースト通知（エラーメッセージ表示）
+    //
+    // showError(message) を呼ぶと画面下にメッセージが3秒表示される。
+    // 連続して呼ばれた場合はタイマーをリセットして表示を延長する。
+    // ============================================================
+    let toastTimer = null;
+
+    function showError(message) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.classList.add('show');
+
+      // 前のタイマーが残っていればリセット（連続エラーで消えてしまわないように）
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.remove('show');
+        toastTimer = null;
+      }, 3000);
+    }
+
+    // オフラインになったときに通知する
+    window.addEventListener('offline', () => {
+      showError('オフラインです。ネットワーク接続を確認してください');
+    });
 
     // ============================================================
     // 認証状態の監視
@@ -1112,6 +1174,7 @@
       // ポップアップでGoogleのログイン画面を開く
       auth.signInWithPopup(provider).catch(err => {
         console.error('ログインエラー:', err);
+        showError('Googleログインに失敗しました。もう一度お試しください');
       });
     }
 
@@ -1548,7 +1611,7 @@
         deadline:  dateInput.value || null,
         category:  categoryInput.value,   // 選択されたカテゴリを保存
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
+      }).catch(() => showError('タスクの追加に失敗しました'));
 
       // 入力欄をリセット（画面更新は onSnapshot が自動でやってくれる）
       input.value         = '';
@@ -1559,14 +1622,16 @@
     // 【削除】指定 id のタスクを Firestore から削除する
     function deleteTask(id) {
       // col.doc(id) で対象ドキュメントを指定し .delete() で削除
-      col.doc(id).delete();
+      col.doc(id).delete()
+        .catch(() => showError('タスクの削除に失敗しました'));
       // 削除後の画面更新も onSnapshot が自動で行う
     }
 
     // 【完了トグル】チェックボックスのオン/オフを Firestore に反映する
     function toggleTask(id, currentDone) {
       // done フィールドだけ反転して update（他のフィールドはそのまま）
-      col.doc(id).update({ done: !currentDone });
+      col.doc(id).update({ done: !currentDone })
+        .catch(() => showError('タスクの更新に失敗しました'));
     }
 
     // 【編集開始】タスク名をクリックしたとき編集モードに切り替える
@@ -1578,7 +1643,8 @@
     // 【編集保存】編集フォームの内容を Firestore に update する
     function saveEdit(id, newText, newDeadline, newCategory) {
       // text・deadline・category の3フィールドを上書き
-      col.doc(id).update({ text: newText, deadline: newDeadline, category: newCategory });
+      col.doc(id).update({ text: newText, deadline: newDeadline, category: newCategory })
+        .catch(() => showError('タスクの保存に失敗しました'));
       currentEditId = null;
       // render() は onSnapshot が検知して自動で呼び出す
     }
@@ -1673,6 +1739,7 @@
               <p class="error-title">接続エラーが発生しました</p>
               <p class="error-sub">ネットワーク接続を確認して、ページを再読み込みしてください。</p>
             </div>`;
+          showError('データの読み込みに失敗しました');
         }
       );
     }
