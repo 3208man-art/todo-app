@@ -61,6 +61,121 @@
       margin-top: 4px;
     }
 
+    /* --- ログイン画面 --- */
+    #login-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      padding: 40px 0 20px;
+      text-align: center;
+    }
+
+    #login-screen h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #0d3b52;
+    }
+
+    #login-screen p {
+      font-size: 0.85rem;
+      color: #5a8fa3;
+      line-height: 1.6;
+    }
+
+    .google-login-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 24px;
+      background: #fff;
+      border: 1.5px solid #b2dce8;
+      border-radius: 12px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      font-family: inherit;
+      color: #0d3b52;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      transition: box-shadow 0.15s, border-color 0.15s;
+    }
+
+    .google-login-btn:hover {
+      border-color: #0d3b52;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.13);
+    }
+
+    .google-login-btn svg {
+      flex-shrink: 0;
+    }
+
+    /* --- ヘッダー（ユーザー情報 + ログアウト） --- */
+    .app-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      gap: 8px;
+    }
+
+    .app-header .titles {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .user-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid #b2dce8;
+    }
+
+    .user-avatar-fallback {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #0d3b52;
+      color: #e0f7fa;
+      font-size: 0.8rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .logout-btn {
+      padding: 5px 12px;
+      background: none;
+      border: 1.5px solid #b2dce8;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-family: inherit;
+      color: #5a8fa3;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+      white-space: nowrap;
+    }
+
+    .logout-btn:hover {
+      color: #0d3b52;
+      border-color: #0d3b52;
+    }
+
+    /* アプリ本体は非表示から始める */
+    #app-screen {
+      display: none;
+    }
+
     /* --- 入力エリア --- */
     .input-area {
       display: flex;
@@ -671,10 +786,39 @@
 </head>
 <body>
   <div class="card">
-    <div class="header">
-      <h1>My ToDo</h1>
-      <p>今日やることを整理しよう</p>
+
+    <!-- ログイン画面（未ログイン時に表示） -->
+    <div id="login-screen">
+      <div class="header">
+        <h1>My ToDo</h1>
+        <p>今日やることを整理しよう</p>
+      </div>
+      <p>Googleアカウントでログインすると<br>タスクをクラウドに保存・同期できます</p>
+      <button class="google-login-btn" onclick="loginWithGoogle()">
+        <!-- Google のロゴ（SVG） -->
+        <svg width="20" height="20" viewBox="0 0 48 48">
+          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+          <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+        </svg>
+        Googleでログイン
+      </button>
     </div>
+
+    <!-- アプリ本体（ログイン後に表示） -->
+    <div id="app-screen">
+      <div class="app-header">
+        <div class="titles">
+          <h1 style="font-size:1.8rem;font-weight:600;color:#0d3b52;letter-spacing:-0.5px;">My ToDo</h1>
+          <p style="font-size:0.85rem;color:#5a8fa3;margin-top:2px;">今日やることを整理しよう</p>
+        </div>
+        <div class="user-info">
+          <img id="user-avatar" class="user-avatar" src="" alt="" style="display:none;">
+          <div id="user-avatar-fallback" class="user-avatar-fallback" style="display:none;"></div>
+          <button class="logout-btn" onclick="logout()">ログアウト</button>
+        </div>
+      </div>
 
     <div class="input-area">
       <div class="input-row">
@@ -730,10 +874,12 @@
 
     <div class="stats" id="stats"></div>
     <ul id="todo-list"></ul>
+    </div><!-- /app-screen -->
   </div>
 
   <!-- Firebase SDK (compat版: 従来の書き方で使える) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
   <script>
@@ -753,14 +899,89 @@
     firebase.initializeApp(firebaseConfig);
 
     // Firestore（データベース）への接続を取得する
-    const db  = firebase.firestore();
-
-    // 'tasks' というコレクション（テーブルのようなもの）を操作する
-    const col = db.collection('tasks');
+    const db   = firebase.firestore();
+    // Authentication（ログイン管理）への接続を取得する
+    const auth = firebase.auth();
 
     // オフライン中でも読み書きできるようにローカルキャッシュを有効化
-    // （ネット復帰時に自動で Firestore へ同期される）
     db.enablePersistence().catch(() => {});
+
+    // ============================================================
+    // ユーザーごとの Firestore コレクション参照
+    //
+    // 全員共通の 'tasks' ではなく、
+    // 'users/{userId}/tasks' という構造にすることで
+    // ユーザーAとユーザーBのタスクが混ざらなくなる。
+    //
+    // 例: users/abc123/tasks/タスクID
+    // ============================================================
+    let col = null;          // ログイン後に設定する
+    let unsubscribe = null;  // onSnapshot の解除関数
+
+    // ============================================================
+    // 認証状態の監視
+    // ログイン/ログアウトが起きるたびに自動で呼ばれる
+    // ============================================================
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        // ログイン中：アプリ本体を表示してデータを読み込む
+        showApp(user);
+      } else {
+        // 未ログイン：ログイン画面を表示してデータ監視を止める
+        showLogin();
+      }
+    });
+
+    // ログイン画面を表示する
+    function showLogin() {
+      document.getElementById('login-screen').style.display = 'flex';
+      document.getElementById('app-screen').style.display   = 'none';
+      // 前のユーザーの onSnapshot を停止する（データが混ざらないように）
+      if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+      tasks = [];
+    }
+
+    // アプリ本体を表示してデータ監視を開始する
+    function showApp(user) {
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('app-screen').style.display   = 'block';
+
+      // ユーザーアバターを表示する
+      const avatarImg      = document.getElementById('user-avatar');
+      const avatarFallback = document.getElementById('user-avatar-fallback');
+      if (user.photoURL) {
+        // Google アカウントのプロフィール画像がある場合
+        avatarImg.src = user.photoURL;
+        avatarImg.style.display      = 'block';
+        avatarFallback.style.display = 'none';
+      } else {
+        // 画像がない場合は名前の頭文字を表示
+        avatarFallback.textContent   = (user.displayName || user.email || '?')[0].toUpperCase();
+        avatarImg.style.display      = 'none';
+        avatarFallback.style.display = 'flex';
+      }
+
+      // このユーザー専用の tasks コレクションを参照する
+      // パス: users/{userId}/tasks
+      col = db.collection('users').doc(user.uid).collection('tasks');
+
+      // Firestore のリアルタイム監視を開始する
+      startListener();
+    }
+
+    // Googleログイン
+    function loginWithGoogle() {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      // ポップアップでGoogleのログイン画面を開く
+      auth.signInWithPopup(provider).catch(err => {
+        console.error('ログインエラー:', err);
+      });
+    }
+
+    // ログアウト
+    function logout() {
+      auth.signOut();
+    }
 
     // ============================================================
 
@@ -1273,33 +1494,26 @@
     // ============================================================
     // Firestore リアルタイムリスナー（onSnapshot）
     //
-    // onSnapshot は「Firestore のデータが変わったら教えて」と登録する仕組み。
-    // 自分の操作だけでなく、別のPC・スマホでの変更も即座に反映される。
-    //
-    // 処理の流れ：
-    //   1. Firestore の 'tasks' コレクションを createdAt 昇順で監視
-    //   2. 変化があるたびに snapshot（最新データの一覧）が届く
-    //   3. tasks 配列を更新して render() を呼び、画面を再描画
-    //
-    // ★ id: doc.id で Firestore のドキュメントIDを各タスクに持たせている
-    //    → これがあるから update / delete で正しいドキュメントを特定できる
+    // ログインユーザーが確定してから呼ばれる。
+    // ログアウト時は unsubscribe() でリスナーを止める。
     // ============================================================
-    col.orderBy('createdAt', 'asc').onSnapshot(
-      snapshot => {
-        // docs の配列を { id, text, done, deadline, category, createdAt } の形に変換
-        tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        render();
-        // タスクが読み込まれるたびに期限チェックを行う
-        // notifiedIds に記録済みのタスクは通知されないので重複しない
-        checkDeadlineNotifications();
-      },
-      err => {
-        // 接続エラー時（設定ミス・ネットワーク断など）はメッセージを表示
-        console.error('Firestore error:', err);
-        todoList.innerHTML =
-          '<p class="empty">接続エラー。Firebase の設定を確認してください。</p>';
-      }
-    );
+    function startListener() {
+      // 前のリスナーが残っていれば止める
+      if (unsubscribe) { unsubscribe(); }
+
+      unsubscribe = col.orderBy('createdAt', 'asc').onSnapshot(
+        snapshot => {
+          tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          render();
+          checkDeadlineNotifications();
+        },
+        err => {
+          console.error('Firestore error:', err);
+          todoList.innerHTML =
+            '<p class="empty">接続エラー。Firebase の設定を確認してください。</p>';
+        }
+      );
+    }
 
     // ページを開いたとき、通知許可をリクエストする
     // 許可されていれば、タスク読み込み後（onSnapshot内）に自動で通知チェックが走る
