@@ -782,6 +782,129 @@
     .edit-category-row select:focus {
       border-color: #0d3b52;
     }
+
+    /* --- ユーザー名 --- */
+    .user-name {
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: #0d3b52;
+      max-width: 100px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* --- ローディング状態 --- */
+    .loading-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      padding: 48px 0 32px;
+      color: #5a8fa3;
+      font-size: 0.88rem;
+    }
+
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid #b2dce8;
+      border-top-color: #0d3b52;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* --- エラー状態 --- */
+    .error-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 36px 0 24px;
+      text-align: center;
+    }
+
+    .error-state .error-icon {
+      font-size: 2rem;
+    }
+
+    .error-state .error-title {
+      font-size: 0.93rem;
+      font-weight: 600;
+      color: #c0392b;
+    }
+
+    .error-state .error-sub {
+      font-size: 0.82rem;
+      color: #a0c4d4;
+    }
+
+    /* --- 空状態（タスク0件） --- */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 40px 0 28px;
+      text-align: center;
+    }
+
+    .empty-state .empty-icon {
+      font-size: 2.4rem;
+      margin-bottom: 4px;
+      opacity: 0.7;
+    }
+
+    .empty-state .empty-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #5a8fa3;
+    }
+
+    .empty-state .empty-sub {
+      font-size: 0.82rem;
+      color: #a0c4d4;
+    }
+
+    /* --- モバイル対応 --- */
+    @media (max-width: 480px) {
+      body {
+        padding: 16px 8px 40px;
+      }
+
+      .card {
+        padding: 24px 20px;
+        border-radius: 20px;
+      }
+
+      .app-header {
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .user-name {
+        display: none; /* スマホは名前を省略してアバターのみ */
+      }
+
+      .filter-btns {
+        gap: 4px;
+      }
+
+      .filter-btn {
+        padding: 4px 10px;
+        font-size: 0.75rem;
+      }
+
+      .input-row button {
+        padding: 12px 14px;
+        font-size: 0.88rem;
+      }
+    }
   </style>
 </head>
 <body>
@@ -816,6 +939,7 @@
         <div class="user-info">
           <img id="user-avatar" class="user-avatar" src="" alt="" style="display:none;">
           <div id="user-avatar-fallback" class="user-avatar-fallback" style="display:none;"></div>
+          <span id="user-name" class="user-name"></span>
           <button class="logout-btn" onclick="logout()">ログアウト</button>
         </div>
       </div>
@@ -872,6 +996,12 @@
       </div>
     </div>
 
+    <!-- ローディング中に表示するインジケーター -->
+    <div id="loading-indicator" class="loading-state" style="display:none;">
+      <div class="spinner"></div>
+      <span>データを読み込み中...</span>
+    </div>
+
     <div class="stats" id="stats"></div>
     <ul id="todo-list"></ul>
     </div><!-- /app-screen -->
@@ -917,6 +1047,7 @@
     // ============================================================
     let col = null;          // ログイン後に設定する
     let unsubscribe = null;  // onSnapshot の解除関数
+    let isFirstLoad = false; // 最初のデータ取得前かどうか
 
     // ============================================================
     // 認証状態の監視
@@ -949,6 +1080,12 @@
       // ユーザーアバターを表示する
       const avatarImg      = document.getElementById('user-avatar');
       const avatarFallback = document.getElementById('user-avatar-fallback');
+      const userNameEl     = document.getElementById('user-name');
+
+      // ユーザー名（姓名の名だけ取り出す。例: "田中 太郎" → "田中"）
+      const displayName = user.displayName || user.email || '';
+      userNameEl.textContent = displayName.split(' ')[0] || '';
+
       if (user.photoURL) {
         // Google アカウントのプロフィール画像がある場合
         avatarImg.src = user.photoURL;
@@ -1224,13 +1361,23 @@
       const filtered = applyFilter(tasks);
 
       if (tasks.length === 0) {
-        todoList.innerHTML = '<p class="empty">タスクがありません</p>';
+        todoList.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">📋</div>
+            <p class="empty-title">タスクがありません</p>
+            <p class="empty-sub">上の入力欄から最初のタスクを追加しましょう</p>
+          </div>`;
         return;
       }
 
       if (filtered.length === 0) {
         // タスクはあるがフィルターで全件除外された場合
-        todoList.innerHTML = '<p class="filter-empty">条件に一致するタスクはありません</p>';
+        todoList.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">🔍</div>
+            <p class="empty-title">条件に一致するタスクはありません</p>
+            <p class="empty-sub">フィルターを変更してみてください</p>
+          </div>`;
         return;
       }
 
@@ -1501,16 +1648,31 @@
       // 前のリスナーが残っていれば止める
       if (unsubscribe) { unsubscribe(); }
 
+      // ローディング表示を開始
+      isFirstLoad = true;
+      document.getElementById('loading-indicator').style.display = 'flex';
+      todoList.innerHTML = '';
+
       unsubscribe = col.orderBy('createdAt', 'asc').onSnapshot(
         snapshot => {
+          // 最初のデータ取得時だけローディングを隠す
+          if (isFirstLoad) {
+            isFirstLoad = false;
+            document.getElementById('loading-indicator').style.display = 'none';
+          }
           tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
           render();
           checkDeadlineNotifications();
         },
         err => {
           console.error('Firestore error:', err);
-          todoList.innerHTML =
-            '<p class="empty">接続エラー。Firebase の設定を確認してください。</p>';
+          document.getElementById('loading-indicator').style.display = 'none';
+          todoList.innerHTML = `
+            <div class="error-state">
+              <div class="error-icon">⚠️</div>
+              <p class="error-title">接続エラーが発生しました</p>
+              <p class="error-sub">ネットワーク接続を確認して、ページを再読み込みしてください。</p>
+            </div>`;
         }
       );
     }
