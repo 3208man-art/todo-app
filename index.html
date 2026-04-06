@@ -468,6 +468,68 @@
       padding: 28px 0;
     }
 
+    /* --- フィルターエリア --- */
+    .filter-area {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .filter-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .filter-row label {
+      font-size: 0.78rem;
+      color: #5a8fa3;
+      white-space: nowrap;
+      min-width: 4em;
+    }
+
+    /* フィルターボタン群 */
+    .filter-btns {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .filter-btn {
+      padding: 4px 12px;
+      border: 1.5px solid #b2dce8;
+      border-radius: 20px;
+      background: #fff;
+      color: #5a8fa3;
+      font-size: 0.78rem;
+      font-family: inherit;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+      white-space: nowrap;
+    }
+
+    .filter-btn:hover {
+      border-color: #0d3b52;
+      color: #0d3b52;
+    }
+
+    /* 選択中のフィルターボタン */
+    .filter-btn.active {
+      background: #0d3b52;
+      border-color: #0d3b52;
+      color: #e0f7fa;
+    }
+
+    /* フィルターで0件になったとき */
+    .filter-empty {
+      text-align: center;
+      color: #a0c4d4;
+      font-size: 0.88rem;
+      padding: 20px 0;
+    }
+
     /* --- カテゴリ選択行 --- */
     .category-row {
       display: flex;
@@ -611,6 +673,28 @@
       </div>
     </div>
 
+    <!-- フィルターUI -->
+    <div class="filter-area">
+      <div class="filter-row">
+        <label>カテゴリ</label>
+        <div class="filter-btns" id="cat-filter-btns">
+          <button class="filter-btn active" data-cat="all">すべて</button>
+          <button class="filter-btn" data-cat="work">仕事</button>
+          <button class="filter-btn" data-cat="shopping">買い物</button>
+          <button class="filter-btn" data-cat="exercise">運動</button>
+          <button class="filter-btn" data-cat="other">その他</button>
+        </div>
+      </div>
+      <div class="filter-row">
+        <label>状態</label>
+        <div class="filter-btns" id="status-filter-btns">
+          <button class="filter-btn active" data-status="all">すべて</button>
+          <button class="filter-btn" data-status="active">未完了</button>
+          <button class="filter-btn" data-status="done">完了</button>
+        </div>
+      </div>
+    </div>
+
     <div class="stats" id="stats"></div>
     <ul id="todo-list"></ul>
   </div>
@@ -670,6 +754,31 @@
     let tasks = [];
     // 現在編集中のタスクID（null = 編集中なし）
     let currentEditId = null;
+
+    // ============================================================
+    // フィルター状態
+    // 現在選ばれているカテゴリ・状態フィルターを変数で管理する。
+    // 'all' = 絞り込みなし
+    // ============================================================
+    let filterCat    = 'all'; // 'all' | 'work' | 'shopping' | 'exercise' | 'other'
+    let filterStatus = 'all'; // 'all' | 'active'（未完了） | 'done'（完了）
+
+    // フィルターを適用してタスクを絞り込む
+    function applyFilter(list) {
+      return list.filter(task => {
+        // カテゴリフィルター：'all' なら全通過、それ以外はカテゴリが一致するものだけ
+        const catOk = filterCat === 'all'
+          || (task.category || 'other') === filterCat;
+
+        // 状態フィルター：'all' なら全通過、'active' は未完了のみ、'done' は完了のみ
+        const statusOk = filterStatus === 'all'
+          || (filterStatus === 'active' && !task.done)
+          || (filterStatus === 'done'   &&  task.done);
+
+        // 両方の条件を満たすタスクだけ残す
+        return catOk && statusOk;
+      });
+    }
 
     // ============================================================
     // 通知機能
@@ -818,12 +927,21 @@
       todoList.innerHTML = '';
       renderStats();
 
+      // フィルターを適用してから描画対象リストを作る
+      const filtered = applyFilter(tasks);
+
       if (tasks.length === 0) {
         todoList.innerHTML = '<p class="empty">タスクがありません</p>';
         return;
       }
 
-      sortTasks(tasks).forEach(task => {
+      if (filtered.length === 0) {
+        // タスクはあるがフィルターで全件除外された場合
+        todoList.innerHTML = '<p class="filter-empty">条件に一致するタスクはありません</p>';
+        return;
+      }
+
+      sortTasks(filtered).forEach(task => {
         const { id } = task;
         const status    = deadlineStatus(task.deadline);
         const isEditing = (id === currentEditId);
@@ -1039,6 +1157,38 @@
     // Enter キーでタスク追加
     input.addEventListener('keydown', e => {
       if (e.key === 'Enter') addTask();
+    });
+
+    // ============================================================
+    // フィルターボタンの初期化
+    //
+    // 各ボタンをクリックしたとき：
+    //   1. 同じグループのボタンから .active クラスを外す
+    //   2. クリックしたボタンに .active クラスを付ける
+    //   3. フィルター変数を更新して render() で再描画する
+    // ============================================================
+
+    // カテゴリフィルターボタン
+    document.getElementById('cat-filter-btns').addEventListener('click', e => {
+      const btn = e.target.closest('.filter-btn');
+      if (!btn) return;
+      // 同グループの全ボタンから active を外してクリックしたボタンに付ける
+      document.querySelectorAll('#cat-filter-btns .filter-btn')
+        .forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      filterCat = btn.dataset.cat; // data-cat 属性の値を取得
+      render();
+    });
+
+    // 状態フィルターボタン
+    document.getElementById('status-filter-btns').addEventListener('click', e => {
+      const btn = e.target.closest('.filter-btn');
+      if (!btn) return;
+      document.querySelectorAll('#status-filter-btns .filter-btn')
+        .forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      filterStatus = btn.dataset.status; // data-status 属性の値を取得
+      render();
     });
 
     // ============================================================
