@@ -1662,8 +1662,11 @@
         deadline:  dateInput.value || null,
         category:  categoryInput.value,   // 選択されたカテゴリを保存
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      }).then(() => showSuccess('保存しました'))
-        .catch(() => showError('タスクの追加に失敗しました'));
+      }).catch(() => showError('タスクの追加に失敗しました'));
+
+      // 書き込み開始と同時に成功トーストを表示する（楽観的表示）
+      // ※ .then() を使うとサーバー確認待ちになり、オフライン時は永遠に呼ばれない
+      showSuccess('保存しました');
 
       // 入力欄をリセット（画面更新は onSnapshot が自動でやってくれる）
       input.value         = '';
@@ -1675,8 +1678,8 @@
     function deleteTask(id) {
       // col.doc(id) で対象ドキュメントを指定し .delete() で削除
       col.doc(id).delete()
-        .then(() => showSuccess('削除しました'))
         .catch(() => showError('タスクの削除に失敗しました'));
+      showSuccess('削除しました'); // 楽観的表示
       // 削除後の画面更新も onSnapshot が自動で行う
     }
 
@@ -1684,8 +1687,8 @@
     function toggleTask(id, currentDone) {
       // done フィールドだけ反転して update（他のフィールドはそのまま）
       col.doc(id).update({ done: !currentDone })
-        .then(() => showSuccess('更新しました'))
         .catch(() => showError('タスクの更新に失敗しました'));
+      showSuccess('更新しました'); // 楽観的表示
     }
 
     // 【編集開始】タスク名をクリックしたとき編集モードに切り替える
@@ -1735,12 +1738,12 @@
 
       // Firestore の document id を使って更新（配列 index は使わない）
       col.doc(id).update({ text: newText, deadline: newDeadline, category: newCategory })
-        .then(() => showSuccess('更新しました'))
         .catch(() => {
           // 保存失敗時：エラーを表示して画面を正しい状態に戻す
           showError('タスクの保存に失敗しました');
           render();
         });
+      showSuccess('更新しました'); // 楽観的表示
       // 成功時は onSnapshot が自動で render() を呼び出す（手動 render 不要）
     }
 
