@@ -938,6 +938,37 @@
       opacity: 1;
       transform: translateX(-50%) translateY(0);
     }
+
+    /* --- 成功トースト ---
+     * エラートースト（画面下・赤）と区別するため、画面上・青緑で表示する。
+     * アニメーションはエラーと逆向き（上から少し落ちてくる）。
+     */
+    #toast-success {
+      position: fixed;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-10px);
+      background: #0d6e60;
+      color: #e0f7fa;
+      padding: 11px 22px;
+      border-radius: 14px;
+      font-size: 0.88rem;
+      font-weight: 500;
+      font-family: 'Inter', 'Segoe UI', sans-serif;
+      box-shadow: 0 6px 22px rgba(0,0,0,0.22);
+      opacity: 0;
+      transition: opacity 0.22s ease, transform 0.22s ease;
+      pointer-events: none;
+      max-width: min(420px, calc(100vw - 32px));
+      text-align: center;
+      z-index: 9999;
+      line-height: 1.5;
+    }
+
+    #toast-success.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
   </style>
 </head>
 <body>
@@ -1040,8 +1071,10 @@
     </div><!-- /app-screen -->
   </div>
 
-  <!-- トースト通知（エラー時に画面下に表示される） -->
+  <!-- エラートースト（画面下・赤） -->
   <div id="toast"></div>
+  <!-- 成功トースト（画面上・青緑） -->
+  <div id="toast-success"></div>
 
   <!-- Firebase SDK (compat版: 従来の書き方で使える) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -1086,10 +1119,13 @@
     let isFirstLoad = false; // 最初のデータ取得前かどうか
 
     // ============================================================
-    // トースト通知（エラーメッセージ表示）
+    // トースト通知
     //
-    // showError(message) を呼ぶと画面下にメッセージが3秒表示される。
-    // 連続して呼ばれた場合はタイマーをリセットして表示を延長する。
+    // showError(message)   → 画面下・赤  ・3秒で消える（エラー用）
+    // showSuccess(message) → 画面上・青緑・2秒で消える（成功用）
+    //
+    // それぞれ独立したタイマーを持つため、
+    // 連続操作しても一方が他方を消してしまうことはない。
     // ============================================================
     let toastTimer = null;
 
@@ -1104,6 +1140,21 @@
         toast.classList.remove('show');
         toastTimer = null;
       }, 3000);
+    }
+
+    let successTimer = null;
+
+    function showSuccess(message) {
+      const toast = document.getElementById('toast-success');
+      toast.textContent = message;
+      toast.classList.add('show');
+
+      // 前のタイマーが残っていればリセット（連続操作でも崩れないように）
+      if (successTimer) clearTimeout(successTimer);
+      successTimer = setTimeout(() => {
+        toast.classList.remove('show');
+        successTimer = null;
+      }, 2000);
     }
 
     // オフラインになったときに通知する
@@ -1611,7 +1662,8 @@
         deadline:  dateInput.value || null,
         category:  categoryInput.value,   // 選択されたカテゴリを保存
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      }).catch(() => showError('タスクの追加に失敗しました'));
+      }).then(() => showSuccess('保存しました'))
+        .catch(() => showError('タスクの追加に失敗しました'));
 
       // 入力欄をリセット（画面更新は onSnapshot が自動でやってくれる）
       input.value         = '';
@@ -1623,6 +1675,7 @@
     function deleteTask(id) {
       // col.doc(id) で対象ドキュメントを指定し .delete() で削除
       col.doc(id).delete()
+        .then(() => showSuccess('削除しました'))
         .catch(() => showError('タスクの削除に失敗しました'));
       // 削除後の画面更新も onSnapshot が自動で行う
     }
@@ -1631,6 +1684,7 @@
     function toggleTask(id, currentDone) {
       // done フィールドだけ反転して update（他のフィールドはそのまま）
       col.doc(id).update({ done: !currentDone })
+        .then(() => showSuccess('更新しました'))
         .catch(() => showError('タスクの更新に失敗しました'));
     }
 
@@ -1681,6 +1735,7 @@
 
       // Firestore の document id を使って更新（配列 index は使わない）
       col.doc(id).update({ text: newText, deadline: newDeadline, category: newCategory })
+        .then(() => showSuccess('更新しました'))
         .catch(() => {
           // 保存失敗時：エラーを表示して画面を正しい状態に戻す
           showError('タスクの保存に失敗しました');
